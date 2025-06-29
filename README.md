@@ -93,12 +93,15 @@ New-AzResourceGroupDeployment `
 
 ## Parameters
 
-| Parameter | Description |
-|-----------|-------------|
-| location | The Azure region to deploy resources to (defaults to the resource group's location) |
-| storageAccountName | The name of the storage account (defaults to a unique name) |
-| storageSku | The SKU for the storage account (defaults to Standard_LRS) |
-| fileShareName | The name of the file share (defaults to unifi-controller) |
+| Parameter | Description | Default Value |
+|-----------|-------------|--------------|
+| location | The Azure region to deploy resources to | Resource group's location |
+| containerGroupName | The name of the container group | unifi-controller |
+| storageAccountName | The name of the storage account | Unique generated name |
+| fileShareName | The name of the file share | unifi-controller |
+| timeZone | Time zone for the container | Europe/Amsterdam |
+| fileShareSizeGB | File share size in GB | 5 |
+| containerMemoryGB | Container memory in GB | 2 |
 
 ## Post-Deployment
 

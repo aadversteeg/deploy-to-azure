@@ -10,6 +10,15 @@ param storageAccountName string = 'stor${uniqueString(resourceGroup().id)}'
 @description('Name of the file share')
 param fileShareName string = 'unifi-controller'
 
+@description('Time zone for the container')
+param timeZone string = 'Europe/Amsterdam'
+
+@description('File share size in GB')
+param fileShareSizeGB int = 5
+
+@description('Container memory in GB')
+param containerMemoryGB int = 2
+
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
   location: location
@@ -32,11 +41,11 @@ resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023-0
   parent: fileService
   name: fileShareName
   properties: {
-    shareQuota: 1024
+    shareQuota: fileShareSizeGB * 1024
+    accessTier: 'TransactionOptimized'
+    enabledProtocols: 'SMB'
   }
 }
-
-var storageAccountKey = listKeys(storageAccount.id, '2023-05-01').keys[0].value
 
 resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
   name: containerGroupName
@@ -44,9 +53,9 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
   properties: {
     containers: [
       {
-        name: 'unifi-controller'
+        name: 'unifi-${uniqueString(resourceGroup().id)}'
         properties: {
-          image: 'linuxserver/unifi-controller:latest'
+          image: 'ghcr.io/jacobalberty/unifi-docker:v8.1'
           ports: [
             {
               port: 8443
@@ -67,24 +76,20 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
           ]
           resources: {
             requests: {
-              cpu: 1
-              memoryInGB: 1.5
+              cpu: json('1')
+              memoryInGB: json(string(containerMemoryGB))
             }
           }
           environmentVariables: [
             {
-              name: 'PUID'
-              value: '1000'
-            }
-            {
-              name: 'PGID'
-              value: '1000'
+              name: 'TZ'
+              value: timeZone
             }
           ]
           volumeMounts: [
             {
               name: 'unifi-config'
-              mountPath: '/config'
+              mountPath: '/unifi'
             }
           ]
         }
@@ -120,7 +125,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
         azureFile: {
           shareName: fileShare.name
           storageAccountName: storageAccount.name
-          storageAccountKey: storageAccountKey
+          storageAccountKey: storageAccount.listKeys().keys[0].value
         }
       }
     ]
