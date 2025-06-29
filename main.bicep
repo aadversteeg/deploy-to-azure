@@ -35,27 +35,13 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-08-01' = {
 resource fileService 'Microsoft.Storage/storageAccounts/fileServices@2021-08-01' = {
   parent: storageAccount
   name: 'default'
-  properties: {
-    protocolSettings: {
-      smb: {}
-    }
-    cors: {
-      corsRules: []
-    }
-    shareDeleteRetentionPolicy: {
-      enabled: true
-      days: 14
-    }
-  }
 }
 
 resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2021-08-01' = {
   parent: fileService
   name: fileShareName
   properties: {
-    accessTier: 'TransactionOptimized'
     shareQuota: 5120
-    enabledProtocols: 'SMB'
   }
 }
 
