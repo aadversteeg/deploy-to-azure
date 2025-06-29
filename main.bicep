@@ -141,7 +141,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-10-01'
         azureFile: {
           shareName: fileShare.name
           storageAccountName: storageAccount.name
-          storageAccountKey: listKeys(storageAccount.id, storageAccount.apiVersion).keys[0].value
+          storageAccountKey: listKeys(storageAccount.id, '2021-08-01').keys[0].value
         }
       }
     ]
