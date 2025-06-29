@@ -45,6 +45,8 @@ resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2021-0
   }
 }
 
+var storageAccountKey = listKeys(storageAccount.id, '2021-08-01').keys[0].value
+
 resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-10-01' = {
   name: 'unifi-controller'
   location: location
@@ -127,7 +129,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-10-01'
         azureFile: {
           shareName: fileShare.name
           storageAccountName: storageAccount.name
-          storageAccountKey: listKeys(storageAccount.id, '2021-08-01').keys[0].value
+          storageAccountKey: storageAccountKey
         }
       }
     ]
