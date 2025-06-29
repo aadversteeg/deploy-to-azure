@@ -1,54 +1,37 @@
-@description('The Azure region to deploy resources to')
+@description('Location for all resources.')
 param location string = resourceGroup().location
 
-@description('The name of the storage account to deploy')
+@description('Name for the container group')
+param containerGroupName string = 'unifi-controller'
+
+@description('Name of the storage account')
 param storageAccountName string = 'stor${uniqueString(resourceGroup().id)}'
 
-@description('The SKU for the storage account')
-@allowed([
-  'Standard_LRS'
-  'Standard_GRS'
-  'Standard_RAGRS'
-  'Standard_ZRS'
-  'Premium_LRS'
-  'Premium_ZRS'
-])
-param storageSku string = 'Standard_LRS'
-
-@description('Specifies the file share name for the UniFi configuration')
+@description('Name of the file share')
 param fileShareName string = 'unifi-controller'
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2021-08-01' = {
+resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
   name: storageAccountName
   location: location
   sku: {
-    name: storageSku
+    name: 'Standard_LRS'
   }
   kind: 'StorageV2'
   properties: {
     accessTier: 'Hot'
     supportsHttpsTrafficOnly: true
-    minimumTlsVersion: 'TLS1_2'
   }
 }
 
-resource fileService 'Microsoft.Storage/storageAccounts/fileServices@2021-08-01' = {
-  parent: storageAccount
-  name: 'default'
-}
-
-resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2021-08-01' = {
-  parent: fileService
-  name: fileShareName
+resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2021-04-01' = {
+  name: '${storageAccount.name}/default/${fileShareName}'
   properties: {
-    shareQuota: 5120
+    shareQuota: 1024
   }
 }
 
-var storageAccountKey = listKeys(storageAccount.id, '2021-08-01').keys[0].value
-
-resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-10-01' = {
-  name: 'unifi-controller'
+resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01' = {
+  name: containerGroupName
   location: location
   properties: {
     containers: [
@@ -76,8 +59,8 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-10-01'
           ]
           resources: {
             requests: {
-              memoryInGB: 1.5
               cpu: 1
+              memoryInGB: 1.5
             }
           }
           environmentVariables: [
@@ -92,7 +75,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-10-01'
           ]
           volumeMounts: [
             {
-              name: 'unifi-config'
+              name: 'filesharevolume'
               mountPath: '/config'
             }
           ]
@@ -125,17 +108,19 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-10-01'
     }
     volumes: [
       {
-        name: 'unifi-config'
+        name: 'filesharevolume'
         azureFile: {
-          shareName: fileShare.name
-          storageAccountName: storageAccount.name
-          storageAccountKey: storageAccountKey
+          shareName: fileShareName
+          storageAccountName: storageAccountName
+          storageAccountKey: listKeys(storageAccount.id, '2021-04-01').keys[0].value
         }
       }
     ]
   }
+  dependsOn: [
+    fileShare
+  ]
 }
 
-output storageAccountName string = storageAccount.name
-output containerGroupFQDN string = containerGroup.properties.ipAddress.fqdn
-output containerGroupIP string = containerGroup.properties.ipAddress.ip
+output containerIPv4Address string = containerGroup.properties.ipAddress.ip
+output containerFQDN string = containerGroup.properties.ipAddress.fqdn
