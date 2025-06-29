@@ -4,32 +4,6 @@ param location string = resourceGroup().location
 @description('Name for the container group')
 param containerGroupName string = 'unifi-controller'
 
-@description('Name of the storage account')
-param storageAccountName string = 'stor${uniqueString(resourceGroup().id)}'
-
-@description('Name of the file share')
-param fileShareName string = 'unifi-controller'
-
-resource storageAccount 'Microsoft.Storage/storageAccounts@2021-04-01' = {
-  name: storageAccountName
-  location: location
-  sku: {
-    name: 'Standard_LRS'
-  }
-  kind: 'StorageV2'
-  properties: {
-    accessTier: 'Hot'
-    supportsHttpsTrafficOnly: true
-  }
-}
-
-resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2021-04-01' = {
-  name: '${storageAccount.name}/default/${fileShareName}'
-  properties: {
-    shareQuota: 1024
-  }
-}
-
 resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01' = {
   name: containerGroupName
   location: location
@@ -73,12 +47,6 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01'
               value: '1000'
             }
           ]
-          volumeMounts: [
-            {
-              name: 'filesharevolume'
-              mountPath: '/config'
-            }
-          ]
         }
       }
     ]
@@ -106,20 +74,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01'
       ]
       dnsNameLabel: 'unifi-controller-${uniqueString(resourceGroup().id)}'
     }
-    volumes: [
-      {
-        name: 'filesharevolume'
-        azureFile: {
-          shareName: fileShareName
-          storageAccountName: storageAccountName
-          storageAccountKey: listKeys(storageAccount.id, '2021-04-01').keys[0].value
-        }
-      }
-    ]
   }
-  dependsOn: [
-    fileShare
-  ]
 }
 
 output containerIPv4Address string = containerGroup.properties.ipAddress.ip
