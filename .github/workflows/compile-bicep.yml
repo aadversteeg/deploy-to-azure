@@ -1,0 +1,39 @@
+name: Compile Bicep to ARM Template
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.bicep'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**.bicep'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Bicep CLI
+        run: |
+          curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x ./bicep
+          sudo mv ./bicep /usr/local/bin/bicep
+          bicep --version
+
+      - name: Compile Bicep to ARM Template
+        run: |
+          bicep build main.bicep
+          ls -la
+
+      - name: Commit and push ARM Template
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'github-actions@github.com'
+          git add main.json
+          git commit -m "Auto-generate ARM template from Bicep" || echo "No changes to commit"
+          git push
