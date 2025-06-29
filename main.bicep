@@ -4,7 +4,39 @@ param location string = resourceGroup().location
 @description('Name for the container group')
 param containerGroupName string = 'unifi-controller'
 
-resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01' = {
+@description('Name of the storage account')
+param storageAccountName string = 'stor${uniqueString(resourceGroup().id)}'
+
+@description('Name of the file share')
+param fileShareName string = 'unifi-controller'
+
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+  name: storageAccountName
+  location: location
+  sku: {
+    name: 'Standard_LRS'
+  }
+  kind: 'StorageV2'
+  properties: {
+    accessTier: 'Hot'
+    supportsHttpsTrafficOnly: true
+  }
+}
+
+resource fileService 'Microsoft.Storage/storageAccounts/fileServices@2023-05-01' = {
+  parent: storageAccount
+  name: 'default'
+}
+
+resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023-05-01' = {
+  parent: fileService
+  name: fileShareName
+  properties: {
+    shareQuota: 1024
+  }
+}
+
+resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
   name: containerGroupName
   location: location
   properties: {
@@ -47,6 +79,12 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01'
               value: '1000'
             }
           ]
+          volumeMounts: [
+            {
+              name: 'unifi-config'
+              mountPath: '/config'
+            }
+          ]
         }
       }
     ]
@@ -74,8 +112,19 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-03-01'
       ]
       dnsNameLabel: 'unifi-controller-${uniqueString(resourceGroup().id)}'
     }
+    volumes: [
+      {
+        name: 'unifi-config'
+        azureFile: {
+          shareName: fileShare.name
+          storageAccountName: storageAccount.name
+          storageAccountKey: storageAccount.listKeys().keys[0].value
+        }
+      }
+    ]
   }
 }
 
 output containerIPv4Address string = containerGroup.properties.ipAddress.ip
 output containerFQDN string = containerGroup.properties.ipAddress.fqdn
+output storageAccountName string = storageAccount.name
