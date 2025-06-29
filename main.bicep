@@ -1,6 +1,3 @@
-@description('The name of the resource group to deploy resources into')
-param resourceGroupName string
-
 @description('The Azure region to deploy resources to')
 param location string = resourceGroup().location
 
@@ -18,8 +15,8 @@ param storageAccountName string = 'stor${uniqueString(resourceGroup().id)}'
 ])
 param storageSku string = 'Standard_LRS'
 
-@description('Specifies the container name for the UniFi configuration')
-param containerName string = 'unifi-controller'
+@description('Specifies the file share name for the UniFi configuration')
+param fileShareName string = 'unifi-controller'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-08-01' = {
   name: storageAccountName
@@ -35,24 +32,30 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-08-01' = {
   }
 }
 
-resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2021-08-01' = {
+resource fileService 'Microsoft.Storage/storageAccounts/fileServices@2021-08-01' = {
   parent: storageAccount
   name: 'default'
   properties: {
+    protocolSettings: {
+      smb: {}
+    }
     cors: {
       corsRules: []
     }
-    deleteRetentionPolicy: {
-      enabled: false
+    shareDeleteRetentionPolicy: {
+      enabled: true
+      days: 14
     }
   }
 }
 
-resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@2021-08-01' = {
-  parent: blobService
-  name: containerName
+resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2021-08-01' = {
+  parent: fileService
+  name: fileShareName
   properties: {
-    publicAccess: 'None'
+    accessTier: 'TransactionOptimized'
+    shareQuota: 5120
+    enabledProtocols: 'SMB'
   }
 }
 
@@ -86,7 +89,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-10-01'
           resources: {
             requests: {
               memoryInGB: 1.5
-              cpu: 1.0
+              cpu: 1
             }
           }
           environmentVariables: [
@@ -136,9 +139,9 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2021-10-01'
       {
         name: 'unifi-config'
         azureFile: {
-          shareName: containerName
+          shareName: fileShare.name
           storageAccountName: storageAccount.name
-          storageAccountKey: listKeys(storageAccount.id, '2021-08-01').keys[0].value
+          storageAccountKey: storageAccount.listKeys().keys[0].value
         }
       }
     ]

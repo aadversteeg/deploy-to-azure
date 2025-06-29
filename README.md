@@ -4,7 +4,7 @@ This repository contains a Bicep template for deploying a Unifi Controller to Az
 
 ## What gets deployed?
 
-- Azure Storage Account with a blob container for Unifi configuration
+- Azure Storage Account with a file share for Unifi configuration
 - Azure Container Instance running the Unifi Controller
 - Public IP address and DNS name for accessing the Unifi Controller
 
@@ -38,14 +38,14 @@ az deployment group create \
   --resource-group $RESOURCE_GROUP_NAME \
   --name $DEPLOYMENT_NAME \
   --template-uri https://raw.githubusercontent.com/aadversteeg/deploy-to-azure/main/main.json \
-  --parameters resourceGroupName=$RESOURCE_GROUP_NAME location=$LOCATION
+  --parameters location=$LOCATION
 
 # 2. Or if using the Bicep file locally:
 az deployment group create \
   --resource-group $RESOURCE_GROUP_NAME \
   --name $DEPLOYMENT_NAME \
   --template-file main.bicep \
-  --parameters resourceGroupName=$RESOURCE_GROUP_NAME location=$LOCATION
+  --parameters location=$LOCATION
 
 # Get the deployment outputs
 az deployment group show \
@@ -78,7 +78,6 @@ New-AzResourceGroupDeployment `
   -ResourceGroupName $resourceGroupName `
   -Name $deploymentName `
   -TemplateUri "https://raw.githubusercontent.com/aadversteeg/deploy-to-azure/main/main.json" `
-  -resourceGroupName $resourceGroupName `
   -location $location
 
 # 2. Or if using the Bicep file locally:
@@ -86,7 +85,6 @@ New-AzResourceGroupDeployment `
   -ResourceGroupName $resourceGroupName `
   -Name $deploymentName `
   -TemplateFile "main.bicep" `
-  -resourceGroupName $resourceGroupName `
   -location $location
 
 # Get the deployment outputs
@@ -97,11 +95,10 @@ New-AzResourceGroupDeployment `
 
 | Parameter | Description |
 |-----------|-------------|
-| resourceGroupName | The name of the resource group to deploy resources into |
 | location | The Azure region to deploy resources to (defaults to the resource group's location) |
 | storageAccountName | The name of the storage account (defaults to a unique name) |
 | storageSku | The SKU for the storage account (defaults to Standard_LRS) |
-| containerName | The name of the blob container (defaults to unifi-controller) |
+| fileShareName | The name of the file share (defaults to unifi-controller) |
 
 ## Post-Deployment
 
