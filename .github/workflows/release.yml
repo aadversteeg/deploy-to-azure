@@ -76,8 +76,11 @@ jobs:
           cp "$GITHUB_WORKSPACE/main.json" latest/
           cp "$GITHUB_WORKSPACE/main.json" "v${{ steps.get_version.outputs.VERSION }}/"
           
+          # Store version for use in HTML
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          
           # Create an index.html with deployment instructions
-          cat > index.html << 'EOF'
+          cat > index.html << EOF
           <!DOCTYPE html>
           <html>
           <head>
@@ -144,7 +147,7 @@ jobs:
                   <h2>📋 Available Versions</h2>
                   <ul class="version-list">
                       <li>📌 <a href="/deploy-to-azure/latest/main.json">Latest</a> - Always points to the most recent release</li>
-                      <li>🏷️ <a href="/deploy-to-azure/v${{ steps.get_version.outputs.VERSION }}/main.json">v${{ steps.get_version.outputs.VERSION }}</a> - Current release</li>
+                      <li>🏷️ <a href="/deploy-to-azure/v${VERSION}/main.json">v${VERSION}</a> - Current release</li>
                   </ul>
                   
                   <h2>🔧 Parameters</h2>
