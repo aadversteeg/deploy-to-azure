@@ -12,10 +12,14 @@ jobs:
     permissions:
       contents: write
       packages: write
+      pages: write
+      id-token: write
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for gh-pages
       
       - name: Extract version from tag
         id: get_version
@@ -46,29 +50,151 @@ jobs:
           echo "✅ Successfully generated main.json"
           echo "File size: $(ls -lh main.json | awk '{print $5}')"
 
-      - name: Update release URLs in README
+      - name: Deploy to GitHub Pages
         run: |
-          # Update the Deploy to Azure button URL to use the latest release
-          # This ensures the README always points to the latest released version
-          RELEASE_URL="https://github.com/${{ github.repository }}/releases/latest/download/main.json"
+          # Configure git
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'github-actions@github.com'
           
-          # Create a deploy URL for the Azure Portal
-          ENCODED_URL=$(echo -n "$RELEASE_URL" | jq -sRr @uri)
-          DEPLOY_URL="https://portal.azure.com/#create/Microsoft.Template/uri/$ENCODED_URL"
+          # Store current branch
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
           
-          # Update README if it exists
-          if [ -f "README.md" ]; then
-            echo "Deploy to Azure button URL:"
-            echo "$DEPLOY_URL"
-            
-            # Create a deploy button markdown snippet
-            cat > deploy-button.md << EOF
-          [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](${DEPLOY_URL})
-          EOF
-            
-            echo "Deploy button markdown:"
-            cat deploy-button.md
+          # Try to checkout gh-pages, create if it doesn't exist
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git checkout gh-pages
+            git pull origin gh-pages
+          else
+            git checkout --orphan gh-pages
+            git rm -rf . || true
           fi
+          
+          # Create directory structure
+          mkdir -p latest
+          mkdir -p "v${{ steps.get_version.outputs.VERSION }}"
+          
+          # Copy main.json to appropriate locations
+          cp "$GITHUB_WORKSPACE/main.json" latest/
+          cp "$GITHUB_WORKSPACE/main.json" "v${{ steps.get_version.outputs.VERSION }}/"
+          
+          # Create an index.html with deployment instructions
+          cat > index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>UniFi on Azure - ARM Templates</title>
+              <meta charset="utf-8">
+              <style>
+                  body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif; margin: 40px; line-height: 1.6; color: #333; }
+                  .container { max-width: 800px; margin: 0 auto; }
+                  .header { border-bottom: 2px solid #0078d4; padding-bottom: 20px; margin-bottom: 30px; }
+                  h1 { color: #0078d4; margin-bottom: 10px; }
+                  .deploy-button { margin: 30px 0; text-align: center; }
+                  .deploy-section { background: #f6f8fa; padding: 30px; border-radius: 8px; margin: 20px 0; }
+                  code { background: #f6f8fa; padding: 2px 6px; border-radius: 3px; font-family: Consolas, Monaco, monospace; }
+                  pre { background: #f6f8fa; padding: 16px; border-radius: 6px; overflow-x: auto; }
+                  .version-list { list-style: none; padding: 0; }
+                  .version-list li { padding: 8px 0; }
+                  .version-list a { color: #0078d4; text-decoration: none; }
+                  .version-list a:hover { text-decoration: underline; }
+                  .resources { background: #e7f3ff; padding: 20px; border-radius: 8px; margin: 20px 0; }
+                  .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>UniFi Controller on Azure</h1>
+                      <p>Deploy UniFi Controller to Azure Container Instances with one click</p>
+                  </div>
+                  
+                  <div class="deploy-section">
+                      <h2>🚀 Quick Deploy</h2>
+                      <div class="deploy-button">
+                          <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Faadversteeg.github.io%2Fdeploy-to-azure%2Flatest%2Fmain.json">
+                              <img src="https://aka.ms/deploytoazurebutton" alt="Deploy to Azure">
+                          </a>
+                      </div>
+                      <p style="text-align: center;"><em>Always deploys the latest stable version</em></p>
+                  </div>
+                  
+                  <div class="resources">
+                      <h3>📦 What Gets Deployed</h3>
+                      <ul>
+                          <li>Azure Container Instance running UniFi Controller v8.1</li>
+                          <li>Azure Storage Account with File Share for persistent configuration</li>
+                          <li>Public IP address with DNS name</li>
+                          <li>HTTPS (8443) and HTTP (8080) endpoints</li>
+                      </ul>
+                  </div>
+                  
+                  <h2>🛠️ Deployment Options</h2>
+                  
+                  <h3>Azure CLI</h3>
+                  <pre><code>az deployment group create \
+    --resource-group &lt;your-rg&gt; \
+    --template-uri https://aadversteeg.github.io/deploy-to-azure/latest/main.json \
+    --parameters location=&lt;your-location&gt;</code></pre>
+                  
+                  <h3>PowerShell</h3>
+                  <pre><code>New-AzResourceGroupDeployment `
+    -ResourceGroupName &lt;your-rg&gt; `
+    -TemplateUri "https://aadversteeg.github.io/deploy-to-azure/latest/main.json" `
+    -location &lt;your-location&gt;</code></pre>
+                  
+                  <h2>📋 Available Versions</h2>
+                  <ul class="version-list">
+                      <li>📌 <a href="/deploy-to-azure/latest/main.json">Latest</a> - Always points to the most recent release</li>
+                      <li>🏷️ <a href="/deploy-to-azure/v${{ steps.get_version.outputs.VERSION }}/main.json">v${{ steps.get_version.outputs.VERSION }}</a> - Current release</li>
+                  </ul>
+                  
+                  <h2>🔧 Parameters</h2>
+                  <table style="width: 100%; border-collapse: collapse;">
+                      <tr style="background: #f6f8fa;">
+                          <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Parameter</th>
+                          <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Default</th>
+                          <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Description</th>
+                      </tr>
+                      <tr>
+                          <td style="padding: 10px; border: 1px solid #ddd;"><code>location</code></td>
+                          <td style="padding: 10px; border: 1px solid #ddd;">Resource group location</td>
+                          <td style="padding: 10px; border: 1px solid #ddd;">Azure region for deployment</td>
+                      </tr>
+                      <tr>
+                          <td style="padding: 10px; border: 1px solid #ddd;"><code>containerGroupName</code></td>
+                          <td style="padding: 10px; border: 1px solid #ddd;">unifi-controller</td>
+                          <td style="padding: 10px; border: 1px solid #ddd;">Name for the container group</td>
+                      </tr>
+                      <tr>
+                          <td style="padding: 10px; border: 1px solid #ddd;"><code>storageAccountName</code></td>
+                          <td style="padding: 10px; border: 1px solid #ddd;">Auto-generated</td>
+                          <td style="padding: 10px; border: 1px solid #ddd;">Storage account name</td>
+                      </tr>
+                      <tr>
+                          <td style="padding: 10px; border: 1px solid #ddd;"><code>timeZone</code></td>
+                          <td style="padding: 10px; border: 1px solid #ddd;">Europe/Amsterdam</td>
+                          <td style="padding: 10px; border: 1px solid #ddd;">Container timezone</td>
+                      </tr>
+                  </table>
+                  
+                  <div class="footer">
+                      <p>View the source on <a href="https://github.com/aadversteeg/deploy-to-azure">GitHub</a></p>
+                  </div>
+              </div>
+          </body>
+          </html>
+          EOF
+          
+          # Add all files
+          git add .
+          
+          # Commit changes
+          git commit -m "Deploy ARM template v${{ steps.get_version.outputs.VERSION }}" || echo "No changes to commit"
+          
+          # Push to gh-pages
+          git push origin gh-pages --force
+          
+          # Return to previous branch/tag
+          git checkout "$CURRENT_BRANCH"
 
       - name: Create deployment package
         run: |
@@ -88,7 +214,16 @@ jobs:
           
           ### Quick Deploy
           
-          [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fgithub.com%2F${{ github.repository_owner }}%2F${{ github.event.repository.name }}%2Freleases%2Flatest%2Fdownload%2Fmain.json)
+          Use the Deploy to Azure button on our [deployment page](https://aadversteeg.github.io/deploy-to-azure/)
+          
+          Or use Azure CLI/PowerShell:
+          
+          \`\`\`bash
+          az deployment group create \\
+            --resource-group <your-rg> \\
+            --template-uri https://aadversteeg.github.io/deploy-to-azure/latest/main.json \\
+            --parameters location=<your-location>
+          \`\`\`
           
           ### Manual Deployment
           
@@ -172,7 +307,15 @@ jobs:
             
             ### 🚀 Quick Deploy
             
-            [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fgithub.com%2F${{ github.repository_owner }}%2F${{ github.event.repository.name }}%2Freleases%2Flatest%2Fdownload%2Fmain.json)
+            [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Faadversteeg.github.io%2Fdeploy-to-azure%2Flatest%2Fmain.json)
+            
+            Or use Azure CLI:
+            ```bash
+            az deployment group create \
+              --resource-group <your-rg> \
+              --template-uri https://aadversteeg.github.io/deploy-to-azure/v${{ steps.get_version.outputs.VERSION }}/main.json \
+              --parameters location=<your-location>
+            ```
             
             ### 📦 What's Included
             
@@ -192,6 +335,10 @@ jobs:
             
             - Azure Subscription
             - Resource Group (or create new during deployment)
+            
+            ### 🌐 Deployment Page
+            
+            Visit our [deployment page](https://aadversteeg.github.io/deploy-to-azure/) for more options.
             
             ### 📝 Changelog
             

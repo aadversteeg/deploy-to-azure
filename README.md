@@ -14,13 +14,11 @@ This repository contains a Bicep template for deploying a Unifi Controller to Az
 
 Click the button below to deploy this template to Azure:
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fgithub.com%2Faadversteeg%2Fdeploy-to-azure%2Freleases%2Flatest%2Fdownload%2Fmain.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Faadversteeg.github.io%2Fdeploy-to-azure%2Flatest%2Fmain.json)
 
 > **Note**: This button always deploys the latest stable release. You can find specific versions in the [Releases](https://github.com/aadversteeg/deploy-to-azure/releases) section.
 
 ### Option 2: Deploy using Azure CLI
-
-You can also deploy this template using the Azure CLI. Here are the required commands:
 
 ```bash
 # Login to Azure
@@ -34,19 +32,11 @@ DEPLOYMENT_NAME="unifi-controller-deployment"
 # Create Resource Group
 az group create --name $RESOURCE_GROUP_NAME --location $LOCATION
 
-# Deploy the template
-# 1. If using the remote template directly from GitHub releases (recommended):
+# Deploy the template directly from GitHub Pages
 az deployment group create \
   --resource-group $RESOURCE_GROUP_NAME \
   --name $DEPLOYMENT_NAME \
-  --template-uri https://github.com/aadversteeg/deploy-to-azure/releases/latest/download/main.json \
-  --parameters location=$LOCATION
-
-# 2. Or if using the Bicep file locally:
-az deployment group create \
-  --resource-group $RESOURCE_GROUP_NAME \
-  --name $DEPLOYMENT_NAME \
-  --template-file main.bicep \
+  --template-uri https://aadversteeg.github.io/deploy-to-azure/latest/main.json \
   --parameters location=$LOCATION
 
 # Get the deployment outputs
@@ -56,11 +46,7 @@ az deployment group show \
   --query properties.outputs
 ```
 
-After deployment, you'll receive output with the FQDN and IP address for accessing your Unifi Controller.
-
-### Option 3: Deploy Using PowerShell
-
-You can also deploy using Azure PowerShell:
+### Option 3: Deploy using PowerShell
 
 ```powershell
 # Login to Azure
@@ -74,24 +60,31 @@ $deploymentName = "unifi-controller-deployment"
 # Create Resource Group
 New-AzResourceGroup -Name $resourceGroupName -Location $location
 
-# Deploy the template
-# 1. If using the remote template directly from GitHub releases (recommended):
+# Deploy the template from GitHub Pages
 New-AzResourceGroupDeployment `
   -ResourceGroupName $resourceGroupName `
   -Name $deploymentName `
-  -TemplateUri "https://github.com/aadversteeg/deploy-to-azure/releases/latest/download/main.json" `
-  -location $location
-
-# 2. Or if using the Bicep file locally:
-New-AzResourceGroupDeployment `
-  -ResourceGroupName $resourceGroupName `
-  -Name $deploymentName `
-  -TemplateFile "main.bicep" `
+  -TemplateUri "https://aadversteeg.github.io/deploy-to-azure/latest/main.json" `
   -location $location
 
 # Get the deployment outputs
 (Get-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -Name $deploymentName).Outputs
 ```
+
+### Option 4: Manual Deployment via Azure Portal
+
+1. Download the `main.json` file from the [latest release](https://github.com/aadversteeg/deploy-to-azure/releases/latest)
+2. Go to the [Azure Portal](https://portal.azure.com)
+3. Search for "Deploy a custom template"
+4. Click "Build your own template in the editor"
+5. Click "Load file" and select the downloaded `main.json`
+6. Click "Save"
+7. Fill in the required parameters:
+   - **Resource Group**: Create new or select existing
+   - **Location**: Your preferred Azure region
+   - Other parameters as needed (see Parameters section below)
+8. Click "Review + create"
+9. Click "Create"
 
 ## Parameters
 
@@ -117,10 +110,11 @@ After deployment completes:
 This repository uses GitHub Actions to:
 1. **Validate** (`validate.yml`) - Automatically validates and compiles the Bicep template on every push to main and every pull request
 2. **Release** (`release.yml`) - Creates GitHub releases with the compiled ARM template when you create a version tag
+3. **GitHub Pages** - Publishes the ARM template to GitHub Pages for easy deployment with the "Deploy to Azure" button
 
-The "Deploy to Azure" button always links to the latest released version, ensuring stable deployments.
-
-**Important**: The first release must be created before the Deploy to Azure button will work, as it links to GitHub releases.
+The ARM templates are available at:
+- Latest version: https://aadversteeg.github.io/deploy-to-azure/latest/main.json
+- Specific versions: https://aadversteeg.github.io/deploy-to-azure/v{VERSION}/main.json
 
 ## Creating a Release
 
@@ -144,19 +138,6 @@ The release workflow will:
   - `main.parameters.example.json` - Example parameters with values
   - `DEPLOYMENT_GUIDE.md` - Detailed deployment instructions
   - ZIP package with all files
-- The "Deploy to Azure" button automatically uses the latest release
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/your-feature-name`)
-3. Make your changes
-4. Test locally: `bicep build main.bicep`
-5. Commit your changes (`git commit -m 'Add some feature'`)
-6. Push to the branch (`git push origin feature/your-feature-name`)
-7. Submit a pull request
-
-The validate workflow will automatically check your Bicep template for errors.
 
 ## Workflow Status
 
