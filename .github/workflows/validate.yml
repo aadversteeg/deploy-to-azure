@@ -1,0 +1,49 @@
+name: Validate Bicep Template
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Bicep CLI
+        run: |
+          # Install specific version for consistency
+          curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x ./bicep
+          sudo mv ./bicep /usr/local/bin/bicep
+          bicep --version
+
+      - name: Validate Bicep syntax
+        run: |
+          echo "Validating Bicep template syntax..."
+          bicep build main.bicep --stdout > /dev/null
+          echo "✅ Bicep template is valid"
+
+      - name: Build Bicep to ARM Template
+        run: |
+          echo "Building ARM template..."
+          bicep build main.bicep
+          
+          if [ -f "main.json" ]; then
+            echo "✅ Successfully compiled main.bicep to main.json"
+            echo "ARM template size: $(ls -lh main.json | awk '{print $5}')"
+          else
+            echo "❌ Failed to generate main.json"
+            exit 1
+          fi
+
+      - name: Display ARM template info
+        run: |
+          echo "Generated ARM template summary:"
+          jq '.parameters | keys' main.json 2>/dev/null || echo "Could not extract parameters"
+          jq '.resources | length' main.json 2>/dev/null | xargs -I {} echo "Number of resources: {}"

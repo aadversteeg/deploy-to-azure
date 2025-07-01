@@ -1,0 +1,201 @@
+name: Release ARM Template
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'  # Only trigger on tags with format like 1.2.3
+      - 'v[0-9]+.[0-9]+.[0-9]+'  # Also support tags with v prefix like v1.2.3
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          # Remove 'v' prefix if present
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION#v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Install Bicep CLI
+        run: |
+          curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x ./bicep
+          sudo mv ./bicep /usr/local/bin/bicep
+          bicep --version
+
+      - name: Build Bicep to ARM Template
+        run: |
+          echo "Building ARM template for release..."
+          bicep build main.bicep
+          
+          if [ ! -f "main.json" ]; then
+            echo "❌ Failed to generate main.json"
+            exit 1
+          fi
+          
+          echo "✅ Successfully generated main.json"
+          echo "File size: $(ls -lh main.json | awk '{print $5}')"
+
+      - name: Update release URLs in README
+        run: |
+          # Update the Deploy to Azure button URL to use the latest release
+          # This ensures the README always points to the latest released version
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/latest/download/main.json"
+          
+          # Create a deploy URL for the Azure Portal
+          ENCODED_URL=$(echo -n "$RELEASE_URL" | jq -sRr @uri)
+          DEPLOY_URL="https://portal.azure.com/#create/Microsoft.Template/uri/$ENCODED_URL"
+          
+          # Update README if it exists
+          if [ -f "README.md" ]; then
+            echo "Deploy to Azure button URL:"
+            echo "$DEPLOY_URL"
+            
+            # Create a deploy button markdown snippet
+            cat > deploy-button.md << EOF
+          [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](${DEPLOY_URL})
+          EOF
+            
+            echo "Deploy button markdown:"
+            cat deploy-button.md
+          fi
+
+      - name: Create deployment package
+        run: |
+          # Create a directory for release artifacts
+          mkdir -p release-artifacts
+          
+          # Copy main files
+          cp main.json release-artifacts/
+          cp main.bicep release-artifacts/
+          cp main.parameters.json release-artifacts/
+          
+          # Create a deployment guide
+          cat > release-artifacts/DEPLOYMENT_GUIDE.md << EOF
+          # UniFi Controller on Azure - Deployment Guide
+          
+          ## Version: ${{ steps.get_version.outputs.VERSION }}
+          
+          ### Quick Deploy
+          
+          [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fgithub.com%2F${{ github.repository_owner }}%2F${{ github.event.repository.name }}%2Freleases%2Flatest%2Fdownload%2Fmain.json)
+          
+          ### Manual Deployment
+          
+          1. Download the \`main.json\` ARM template from this release
+          2. Open Azure Portal
+          3. Search for "Deploy a custom template"
+          4. Select "Build your own template in the editor"
+          5. Load the \`main.json\` file
+          6. Fill in the required parameters
+          7. Review and create
+          
+          ### Parameters
+          
+          - **location**: Azure region for deployment (e.g., 'eastus', 'westeurope')
+          - **containerGroupName**: Name for the container group (default: 'unifi-controller')
+          - **storageAccountName**: Name for the storage account (auto-generated if not specified)
+          - **fileShareName**: Name for the file share (default: 'unifi-controller')
+          - **timeZone**: Container timezone (default: 'Europe/Amsterdam')
+          - **fileShareSizeGB**: File share size in GB (default: 5)
+          - **containerMemoryGB**: Container memory in GB (default: 2)
+          
+          ### Post-Deployment
+          
+          After deployment, you can access your UniFi Controller at:
+          - HTTPS: \`https://<container-fqdn>:8443\`
+          - HTTP: \`http://<container-fqdn>:8080\`
+          
+          The FQDN and IP address are available in the deployment outputs.
+          EOF
+          
+          # Create a parameters example
+          cat > release-artifacts/main.parameters.example.json << EOF
+          {
+            "\$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+            "contentVersion": "1.0.0.0",
+            "parameters": {
+              "location": {
+                "value": "westeurope"
+              },
+              "containerGroupName": {
+                "value": "unifi-controller"
+              },
+              "storageAccountName": {
+                "value": ""
+              },
+              "fileShareName": {
+                "value": "unifi-controller"
+              },
+              "timeZone": {
+                "value": "Europe/Amsterdam"
+              },
+              "fileShareSizeGB": {
+                "value": 5
+              },
+              "containerMemoryGB": {
+                "value": 2
+              }
+            }
+          }
+          EOF
+          
+          # Zip all artifacts
+          cd release-artifacts
+          zip -r ../unifi-azure-deploy-${{ steps.get_version.outputs.VERSION }}.zip .
+          cd ..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: UniFi on Azure ${{ steps.get_version.outputs.VERSION }}
+          tag_name: ${{ steps.get_version.outputs.TAG_NAME }}
+          files: |
+            release-artifacts/main.json
+            release-artifacts/main.bicep
+            release-artifacts/main.parameters.json
+            release-artifacts/main.parameters.example.json
+            release-artifacts/DEPLOYMENT_GUIDE.md
+            unifi-azure-deploy-${{ steps.get_version.outputs.VERSION }}.zip
+          body: |
+            ## UniFi Controller on Azure Container Instances
+            
+            ### 🚀 Quick Deploy
+            
+            [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fgithub.com%2F${{ github.repository_owner }}%2F${{ github.event.repository.name }}%2Freleases%2Flatest%2Fdownload%2Fmain.json)
+            
+            ### 📦 What's Included
+            
+            - ARM Template (`main.json`) - Ready to deploy
+            - Bicep Template (`main.bicep`) - Source template
+            - Parameters File (`main.parameters.json`) - Deployment parameters
+            - Example Parameters (`main.parameters.example.json`) - Filled example
+            - Deployment Guide (`DEPLOYMENT_GUIDE.md`) - Detailed instructions
+            
+            ### 🔧 Resources Created
+            
+            - Azure Container Instance running UniFi Controller v8.1
+            - Azure Storage Account with File Share for persistent data
+            - Public IP with DNS name
+            
+            ### 📋 Requirements
+            
+            - Azure Subscription
+            - Resource Group (or create new during deployment)
+            
+            ### 📝 Changelog
+            
+            See commit history for detailed changes.
+          generate_release_notes: true
+          draft: false
+          prerelease: false

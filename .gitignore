@@ -19,3 +19,6 @@ crash.*.log
 # Temporary files
 *.tmp
 *.bak
+
+# Generated ARM templates
+main.json

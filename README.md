@@ -14,7 +14,9 @@ This repository contains a Bicep template for deploying a Unifi Controller to Az
 
 Click the button below to deploy this template to Azure:
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Faadversteeg%2Fdeploy-to-azure%2Fmain%2Fmain.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fgithub.com%2Faadversteeg%2Fdeploy-to-azure%2Freleases%2Flatest%2Fdownload%2Fmain.json)
+
+> **Note**: This button always deploys the latest stable release. You can find specific versions in the [Releases](https://github.com/aadversteeg/deploy-to-azure/releases) section.
 
 ### Option 2: Deploy using Azure CLI
 
@@ -33,11 +35,11 @@ DEPLOYMENT_NAME="unifi-controller-deployment"
 az group create --name $RESOURCE_GROUP_NAME --location $LOCATION
 
 # Deploy the template
-# 1. If using the remote template directly from GitHub:
+# 1. If using the remote template directly from GitHub releases (recommended):
 az deployment group create \
   --resource-group $RESOURCE_GROUP_NAME \
   --name $DEPLOYMENT_NAME \
-  --template-uri https://raw.githubusercontent.com/aadversteeg/deploy-to-azure/main/main.json \
+  --template-uri https://github.com/aadversteeg/deploy-to-azure/releases/latest/download/main.json \
   --parameters location=$LOCATION
 
 # 2. Or if using the Bicep file locally:
@@ -73,11 +75,11 @@ $deploymentName = "unifi-controller-deployment"
 New-AzResourceGroup -Name $resourceGroupName -Location $location
 
 # Deploy the template
-# 1. If using the remote template directly from GitHub:
+# 1. If using the remote template directly from GitHub releases (recommended):
 New-AzResourceGroupDeployment `
   -ResourceGroupName $resourceGroupName `
   -Name $deploymentName `
-  -TemplateUri "https://raw.githubusercontent.com/aadversteeg/deploy-to-azure/main/main.json" `
+  -TemplateUri "https://github.com/aadversteeg/deploy-to-azure/releases/latest/download/main.json" `
   -location $location
 
 # 2. Or if using the Bicep file locally:
@@ -112,22 +114,51 @@ After deployment completes:
 
 ## How it works
 
-This repository uses GitHub Actions to automatically compile the Bicep template (`main.bicep`) to an ARM template (`main.json`) whenever changes are pushed to the repository. The "Deploy to Azure" button then links to this JSON file for deployment.
+This repository uses GitHub Actions to:
+1. **Validate** (`validate.yml`) - Automatically validates and compiles the Bicep template on every push to main and every pull request
+2. **Release** (`release.yml`) - Creates GitHub releases with the compiled ARM template when you create a version tag
 
-## Setting up GitHub Actions
+The "Deploy to Azure" button always links to the latest released version, ensuring stable deployments.
 
-To make the GitHub Actions workflow work properly:
+**Important**: The first release must be created before the Deploy to Azure button will work, as it links to GitHub releases.
 
-1. Push this repository to GitHub:
+## Creating a Release
+
+To create a new release:
+
+1. Make your changes to the Bicep template
+2. Commit and push your changes to main
+3. Wait for the validation workflow to pass
+4. Create a version tag:
+   ```bash
+   git tag 1.0.0  # or v1.0.0
+   git push origin 1.0.0
    ```
-   git add .
-   git commit -m "Initial commit"
-   git remote add origin https://github.com/aadversteeg/deploy-to-azure.git
-   git push -u origin main
-   ```
 
-2. In your GitHub repository, go to **Settings > Actions > General**:
-   - Under "Workflow permissions", select "Read and write permissions"
-   - Click "Save"
+The release workflow will:
+- Compile the Bicep template to ARM JSON
+- Create a GitHub release with:
+  - `main.json` - ARM template ready for deployment
+  - `main.bicep` - Source Bicep template
+  - `main.parameters.json` - Parameters file
+  - `main.parameters.example.json` - Example parameters with values
+  - `DEPLOYMENT_GUIDE.md` - Detailed deployment instructions
+  - ZIP package with all files
+- The "Deploy to Azure" button automatically uses the latest release
 
-Now, whenever you make changes to the Bicep file and push it to GitHub, the workflow will automatically compile it to a JSON ARM template.
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature-name`)
+3. Make your changes
+4. Test locally: `bicep build main.bicep`
+5. Commit your changes (`git commit -m 'Add some feature'`)
+6. Push to the branch (`git push origin feature/your-feature-name`)
+7. Submit a pull request
+
+The validate workflow will automatically check your Bicep template for errors.
+
+## Workflow Status
+
+![Validate Bicep](https://github.com/aadversteeg/deploy-to-azure/actions/workflows/validate.yml/badge.svg)
+![Release](https://github.com/aadversteeg/deploy-to-azure/actions/workflows/release.yml/badge.svg)
