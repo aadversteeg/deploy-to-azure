@@ -55,7 +55,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
       {
         name: 'unifi-controller'
         properties: {
-          image: 'jacobalberty/unifi:v7.5.187'
+          image: 'ghcr.io/jacobalberty/unifi-docker:v7.5.187'
           ports: [
             {
               port: 8443
