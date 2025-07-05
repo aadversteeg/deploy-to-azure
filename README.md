@@ -109,8 +109,9 @@ After deployment completes:
 
 This repository uses GitHub Actions to:
 1. **Validate** (`validate.yml`) - Automatically validates and compiles the Bicep template on every push to main and every pull request
-2. **Release** (`release.yml`) - Creates GitHub releases with the compiled ARM template when you create a version tag
-3. **GitHub Pages** - Publishes the ARM template to GitHub Pages for easy deployment with the "Deploy to Azure" button
+2. **Deploy** (`deploy.yml`) - Directly deploys to Azure on push to main or manual trigger with configurable parameters
+3. **Release** (`release.yml`) - Creates GitHub releases with the compiled ARM template when you create a version tag
+4. **GitHub Pages** - Publishes the ARM template to GitHub Pages for easy deployment with the "Deploy to Azure" button
 
 The ARM templates are available at:
 - Latest version: https://aadversteeg.github.io/deploy-to-azure/latest/main.json
@@ -139,7 +140,24 @@ The release workflow will:
   - `DEPLOYMENT_GUIDE.md` - Detailed deployment instructions
   - ZIP package with all files
 
+## Direct Deployment from GitHub
+
+This repository also supports direct deployment to Azure using GitHub Actions:
+
+### Setup
+1. Create an Azure Service Principal and add it as a GitHub secret named `AZURE_CREDENTIALS`
+2. Configure repository variables:
+   - `AZURE_SUBSCRIPTION_ID` (required)
+   - `AZURE_RESOURCE_GROUP` (required)
+   - Additional optional variables (see [DEPLOYMENT_CONFIG.md](DEPLOYMENT_CONFIG.md))
+
+### Deploy
+- **Manual**: Use Actions → Deploy to Azure → Run workflow
+
+For detailed configuration instructions, see [DEPLOYMENT_CONFIG.md](DEPLOYMENT_CONFIG.md).
+
 ## Workflow Status
 
 ![Validate Bicep](https://github.com/aadversteeg/deploy-to-azure/actions/workflows/validate.yml/badge.svg)
+![Deploy to Azure](https://github.com/aadversteeg/deploy-to-azure/actions/workflows/deploy.yml/badge.svg)
 ![Release](https://github.com/aadversteeg/deploy-to-azure/actions/workflows/release.yml/badge.svg)

@@ -1,0 +1,191 @@
+name: Deploy to Azure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+env:
+  # Default values - can be overridden by repository variables
+  AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'unifi-controller-rg' }}
+  CONTAINER_GROUP_NAME: ${{ vars.CONTAINER_GROUP_NAME || 'unifi-controller' }}
+  LOCATION: ${{ vars.LOCATION || 'westeurope' }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      arm-template: ${{ steps.build.outputs.arm-template }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Bicep CLI
+        run: |
+          curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x ./bicep
+          sudo mv ./bicep /usr/local/bin/bicep
+          bicep --version
+
+      - name: Validate Bicep template
+        run: |
+          echo "Validating Bicep template..."
+          bicep build main.bicep --stdout > /dev/null
+          echo "✅ Bicep template is valid"
+
+      - name: Build ARM template
+        id: build
+        run: |
+          echo "Building ARM template..."
+          bicep build main.bicep
+          
+          if [ -f "main.json" ]; then
+            echo "✅ Successfully compiled main.bicep to main.json"
+            echo "arm-template=main.json" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Failed to generate main.json"
+            exit 1
+          fi
+
+      - name: Upload ARM template artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: arm-template
+          path: main.json
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download ARM template artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: arm-template
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set Azure Subscription
+        run: |
+          az account set --subscription ${{ env.AZURE_SUBSCRIPTION_ID }}
+          echo "Current subscription:"
+          az account show
+
+      - name: Create Resource Group
+        run: |
+          echo "Ensuring resource group '${{ env.AZURE_RESOURCE_GROUP }}' exists in '${{ env.LOCATION }}'..."
+          az group create \
+            --name ${{ env.AZURE_RESOURCE_GROUP }} \
+            --location ${{ env.LOCATION }} \
+            --tags Environment=${{ github.event.inputs.environment || 'production' }} DeployedBy=GitHubActions
+
+      - name: Validate deployment
+        run: |
+          echo "Validating deployment..."
+          az deployment group validate \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --template-file main.json \
+            --parameters \
+              location=${{ env.LOCATION }} \
+              containerGroupName=${{ env.CONTAINER_GROUP_NAME }} \
+              timeZone="${{ vars.TIME_ZONE || 'Europe/Amsterdam' }}" \
+              fileShareSizeGB=${{ vars.FILE_SHARE_SIZE_GB || 5 }} \
+              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 2 }}
+
+      - name: What-If deployment preview
+        run: |
+          echo "Running What-If analysis..."
+          az deployment group what-if \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --template-file main.json \
+            --parameters \
+              location=${{ env.LOCATION }} \
+              containerGroupName=${{ env.CONTAINER_GROUP_NAME }} \
+              timeZone="${{ vars.TIME_ZONE || 'Europe/Amsterdam' }}" \
+              fileShareSizeGB=${{ vars.FILE_SHARE_SIZE_GB || 5 }} \
+              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 2 }}
+
+      - name: Deploy to Azure
+        id: deploy
+        run: |
+          echo "Deploying to Azure..."
+          output=$(az deployment group create \
+            --name "unifi-deploy-$(date +%Y%m%d%H%M%S)" \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --template-file main.json \
+            --parameters \
+              location=${{ env.LOCATION }} \
+              containerGroupName=${{ env.CONTAINER_GROUP_NAME }} \
+              timeZone="${{ vars.TIME_ZONE || 'Europe/Amsterdam' }}" \
+              fileShareSizeGB=${{ vars.FILE_SHARE_SIZE_GB || 5 }} \
+              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 2 }} \
+            --query properties.outputs \
+            -o json)
+          
+          echo "Deployment outputs:"
+          echo "$output" | jq .
+          
+          # Extract outputs for job summary
+          echo "CONTAINER_FQDN=$(echo $output | jq -r .containerFQDN.value)" >> $GITHUB_ENV
+          echo "CONTAINER_IP=$(echo $output | jq -r .containerIPv4Address.value)" >> $GITHUB_ENV
+          echo "STORAGE_ACCOUNT=$(echo $output | jq -r .storageAccountName.value)" >> $GITHUB_ENV
+
+      - name: Create deployment summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          # 🚀 Deployment Summary
+          
+          ## Deployment Details
+          - **Environment**: ${{ github.event.inputs.environment || 'production' }}
+          - **Resource Group**: ${{ env.AZURE_RESOURCE_GROUP }}
+          - **Location**: ${{ env.LOCATION }}
+          - **Container Group**: ${{ env.CONTAINER_GROUP_NAME }}
+          
+          ## Access Information
+          - **FQDN**: https://${{ env.CONTAINER_FQDN }}:8443
+          - **IP Address**: ${{ env.CONTAINER_IP }}
+          - **Storage Account**: ${{ env.STORAGE_ACCOUNT }}
+          
+          ## Post-Deployment Steps
+          1. Wait 2-3 minutes for the container to fully start
+          2. Access the UniFi Controller at: https://${{ env.CONTAINER_FQDN }}:8443
+          3. Complete the initial setup wizard
+          
+          ## Resources Created
+          - ✅ Azure Container Instance (UniFi Controller v8.1)
+          - ✅ Azure Storage Account with File Share
+          - ✅ Public IP with DNS name
+          
+          ---
+          *Deployed by GitHub Actions at $(date -u)*
+          EOF
+
+      - name: Tag deployment
+        if: success()
+        run: |
+          # Tag the resource group with deployment info
+          az group update \
+            --name ${{ env.AZURE_RESOURCE_GROUP }} \
+            --tags \
+              Environment=${{ github.event.inputs.environment || 'production' }} \
+              DeployedBy=GitHubActions \
+              DeploymentDate=$(date -u +%Y-%m-%d) \
+              GitHubRun=${{ github.run_id }} \
+              CommitSHA=${{ github.sha }}
