@@ -55,7 +55,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
       {
         name: 'unifi-controller'
         properties: {
-          image: 'ghcr.io/jacobalberty/unifi-docker:latest'
+          image: 'ghcr.io/jacobalberty/unifi-docker:v8.6.9'
           ports: [
             {
               port: 8443
@@ -95,15 +95,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
             }
             {
               name: 'RUNAS_UID0'
-              value: 'false'
-            }
-            {
-              name: 'UNIFI_UID'
-              value: '999'
-            }
-            {
-              name: 'UNIFI_GID'
-              value: '999'
+              value: 'true'
             }
           ]
           volumeMounts: [
