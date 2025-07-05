@@ -106,8 +106,8 @@ jobs:
               location=${{ env.LOCATION }} \
               containerGroupName=${{ env.CONTAINER_GROUP_NAME }} \
               timeZone="${{ vars.TIME_ZONE || 'Europe/Amsterdam' }}" \
-              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 2 }} \
-              containerCpuCores=${{ vars.CONTAINER_CPU_CORES || 1 }}
+              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 3 }} \
+              containerCpuCores=${{ vars.CONTAINER_CPU_CORES || 2 }}
 
       - name: What-If deployment preview
         run: |
@@ -119,8 +119,8 @@ jobs:
               location=${{ env.LOCATION }} \
               containerGroupName=${{ env.CONTAINER_GROUP_NAME }} \
               timeZone="${{ vars.TIME_ZONE || 'Europe/Amsterdam' }}" \
-              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 2 }} \
-              containerCpuCores=${{ vars.CONTAINER_CPU_CORES || 1 }}
+              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 3 }} \
+              containerCpuCores=${{ vars.CONTAINER_CPU_CORES || 2 }}
 
       - name: Deploy to Azure
         id: deploy
@@ -134,8 +134,8 @@ jobs:
               location=${{ env.LOCATION }} \
               containerGroupName=${{ env.CONTAINER_GROUP_NAME }} \
               timeZone="${{ vars.TIME_ZONE || 'Europe/Amsterdam' }}" \
-              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 2 }} \
-              containerCpuCores=${{ vars.CONTAINER_CPU_CORES || 1 }} \
+              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 3 }} \
+              containerCpuCores=${{ vars.CONTAINER_CPU_CORES || 2 }} \
             --query properties.outputs \
             -o json)
           
@@ -169,8 +169,7 @@ jobs:
           3. Complete the initial setup wizard
           
           ## Resources Created
-          - ✅ Azure Container Instance with UniFi Network Application
-          - ✅ MongoDB 4.4 sidecar container
+          - ✅ Azure Container Instance with UniFi Network Application (embedded MongoDB)
           - ✅ Azure Storage Account for backups
           - ✅ Public IP with DNS name
           

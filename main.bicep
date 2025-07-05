@@ -10,11 +10,11 @@ param storageAccountName string = 'stor${uniqueString(resourceGroup().id)}'
 @description('Time zone for the container')
 param timeZone string = 'Europe/Amsterdam'
 
-@description('Container memory in GB for UniFi')
-param containerMemoryGB int = 2
+@description('Container memory in GB')
+param containerMemoryGB int = 3
 
-@description('Container CPU cores for UniFi')
-param containerCpuCores int = 1
+@description('Container CPU cores')
+param containerCpuCores int = 2
 
 // Storage account for backups only
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
@@ -46,7 +46,7 @@ resource backupShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023
   }
 }
 
-// Container Instance with UniFi Controller and MongoDB sidecar
+// Single Container with UniFi Controller (includes embedded MongoDB)
 resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
   name: containerGroupName
   location: location
@@ -55,7 +55,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
       {
         name: 'unifi-controller'
         properties: {
-          image: 'lscr.io/linuxserver/unifi-network-application:latest'
+          image: 'ghcr.io/jacobalberty/unifi-docker:latest'
           ports: [
             {
               port: 8443
@@ -94,88 +94,42 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
               value: timeZone
             }
             {
-              name: 'MONGO_USER'
+              name: 'RUNAS_UID0'
+              value: 'false'
+            }
+            {
+              name: 'UNIFI_UID'
+              value: '999'
+            }
+            {
+              name: 'UNIFI_GID'
+              value: '999'
+            }
+            {
+              name: 'DB_MONGO_LOCAL'
+              value: 'true'
+            }
+            {
+              name: 'DB_MONGO_URL'
+              value: 'mongodb://127.0.0.1:27017/unifi'
+            }
+            {
+              name: 'STATDB_MONGO_URL'
+              value: 'mongodb://127.0.0.1:27017/unifi_stat'
+            }
+            {
+              name: 'UNIFI_DB_NAME'
               value: 'unifi'
-            }
-            {
-              name: 'MONGO_PASS'
-              value: 'unifipassword'
-            }
-            {
-              name: 'MONGO_HOST'
-              value: 'localhost'
-            }
-            {
-              name: 'MONGO_PORT'
-              value: '27017'
-            }
-            {
-              name: 'MONGO_DBNAME'
-              value: 'unifi'
-            }
-            {
-              name: 'MEM_LIMIT'
-              value: '1024'
-            }
-            {
-              name: 'MEM_STARTUP'
-              value: '1024'
-            }
-            {
-              name: 'PUID'
-              value: '1000'
-            }
-            {
-              name: 'PGID'
-              value: '1000'
             }
           ]
           volumeMounts: [
             {
-              name: 'unifi-config'
-              mountPath: '/config'
+              name: 'unifi-data'
+              mountPath: '/unifi'
             }
             {
               name: 'unifi-backups'
-              mountPath: '/config/data/backup'
-            }
-          ]
-        }
-      }
-      {
-        name: 'mongodb'
-        properties: {
-          image: 'docker.io/library/mongo:4.4'
-          ports: [
-            {
-              port: 27017
-              protocol: 'TCP'
-            }
-          ]
-          resources: {
-            requests: {
-              cpu: json('0.5')
-              memoryInGB: json('1')
-            }
-          }
-          environmentVariables: [
-            {
-              name: 'MONGO_INITDB_ROOT_USERNAME'
-              value: 'unifi'
-            }
-            {
-              name: 'MONGO_INITDB_ROOT_PASSWORD'
-              value: 'unifipassword'
-            }
-            {
-              name: 'MONGO_INITDB_DATABASE'
-              value: 'unifi'
-            }
-          ]
-          volumeMounts: [
-            {
-              name: 'mongodb-data'
-              mountPath: '/data/db'
+              mountPath: '/unifi/data/backup'
             }
           ]
         }
@@ -215,11 +169,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
     }
     volumes: [
       {
-        name: 'unifi-config'
-        emptyDir: {}
-      }
-      {
-        name: 'mongodb-data'
+        name: 'unifi-data'
         emptyDir: {}
       }
       {
@@ -239,4 +189,4 @@ output containerFQDN string = containerGroup.properties.ipAddress.fqdn
 output storageAccountName string = storageAccount.name
 output backupShareName string = backupShare.name
 output accessUrl string = 'https://${containerGroup.properties.ipAddress.fqdn}:8443'
-output deploymentNotes string = 'UniFi with MongoDB sidecar. Data in EmptyDir, backups in Azure Files.'
+output deploymentNotes string = 'Single container with embedded MongoDB. Data in EmptyDir, backups in Azure Files.'
