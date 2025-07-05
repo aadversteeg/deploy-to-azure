@@ -62,7 +62,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
             }
             {
               name: 'RUNAS_UID0'
-              value: 'false'
+              value: 'true'
             }
           ]
           volumeMounts: [
