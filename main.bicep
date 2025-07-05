@@ -22,7 +22,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
       {
         name: 'unifi-controller'
         properties: {
-          image: 'ghcr.io/jacobalberty/unifi-docker:latest'
+          image: 'ghcr.io/jacobalberty/unifi-docker:v9.2.87'
           ports: [
             {
               port: 8443
@@ -63,6 +63,18 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
             {
               name: 'RUNAS_UID0'
               value: 'true'
+            }
+            {
+              name: 'UNIFI_STDOUT'
+              value: 'true'
+            }
+            {
+              name: 'JVM_INIT_HEAP_SIZE'
+              value: '512M'
+            }
+            {
+              name: 'JVM_MAX_HEAP_SIZE'
+              value: '1024M'
             }
           ]
           volumeMounts: [
@@ -118,4 +130,4 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
 output containerIPv4Address string = containerGroup.properties.ipAddress.ip
 output containerFQDN string = containerGroup.properties.ipAddress.fqdn
 output accessUrl string = 'https://${containerGroup.properties.ipAddress.fqdn}:8443'
-output deploymentNotes string = 'UniFi Controller with embedded MongoDB using ghcr.io/jacobalberty/unifi-docker:latest'
+output deploymentNotes string = 'UniFi Controller v9.2.87 with embedded MongoDB from ghcr.io'
