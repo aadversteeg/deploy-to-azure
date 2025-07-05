@@ -4,47 +4,14 @@ param location string = resourceGroup().location
 @description('Name for the container group')
 param containerGroupName string = 'unifi-controller'
 
-@description('Name of the storage account')
-param storageAccountName string = 'stor${uniqueString(resourceGroup().id)}'
-
 @description('Time zone for the container')
 param timeZone string = 'Europe/Amsterdam'
 
 @description('Container memory in GB')
-param containerMemoryGB int = 3
+param containerMemoryGB int = 2
 
 @description('Container CPU cores')
-param containerCpuCores int = 2
-
-// Storage account for UniFi data and backups
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  name: storageAccountName
-  location: location
-  sku: {
-    name: 'Standard_LRS'
-  }
-  kind: 'StorageV2'
-  properties: {
-    accessTier: 'Hot'
-    supportsHttpsTrafficOnly: true
-    minimumTlsVersion: 'TLS1_2'
-  }
-}
-
-resource fileService 'Microsoft.Storage/storageAccounts/fileServices@2023-05-01' = {
-  parent: storageAccount
-  name: 'default'
-}
-
-resource unifiShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023-05-01' = {
-  parent: fileService
-  name: 'unifi-data'
-  properties: {
-    shareQuota: 50
-    accessTier: 'TransactionOptimized'
-    enabledProtocols: 'SMB'
-  }
-}
+param containerCpuCores int = 1
 
 // Single Container with UniFi Controller (includes embedded MongoDB)
 resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
@@ -55,7 +22,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
       {
         name: 'unifi-controller'
         properties: {
-          image: 'ghcr.io/jacobalberty/unifi-docker:v9.2.87'
+          image: 'ghcr.io/jacobalberty/unifi-docker:latest'
           ports: [
             {
               port: 8443
@@ -95,17 +62,13 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
             }
             {
               name: 'RUNAS_UID0'
-              value: 'true'
+              value: 'false'
             }
           ]
           volumeMounts: [
             {
               name: 'unifi-data'
               mountPath: '/unifi'
-            }
-            {
-              name: 'mongodb-data'
-              mountPath: '/unifi/data/db'
             }
           ]
         }
@@ -146,14 +109,6 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
     volumes: [
       {
         name: 'unifi-data'
-        azureFile: {
-          shareName: unifiShare.name
-          storageAccountName: storageAccount.name
-          storageAccountKey: storageAccount.listKeys().keys[0].value
-        }
-      }
-      {
-        name: 'mongodb-data'
         emptyDir: {}
       }
     ]
@@ -162,7 +117,5 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
 
 output containerIPv4Address string = containerGroup.properties.ipAddress.ip
 output containerFQDN string = containerGroup.properties.ipAddress.fqdn
-output storageAccountName string = storageAccount.name
-output unifiShareName string = unifiShare.name
 output accessUrl string = 'https://${containerGroup.properties.ipAddress.fqdn}:8443'
-output deploymentNotes string = 'Single container with embedded MongoDB. MongoDB data in EmptyDir for performance, UniFi data in Azure Files.'
+output deploymentNotes string = 'UniFi Controller with embedded MongoDB using ghcr.io/jacobalberty/unifi-docker:latest'

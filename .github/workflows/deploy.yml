@@ -106,8 +106,8 @@ jobs:
               location=${{ env.LOCATION }} \
               containerGroupName=${{ env.CONTAINER_GROUP_NAME }} \
               timeZone="${{ vars.TIME_ZONE || 'Europe/Amsterdam' }}" \
-              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 3 }} \
-              containerCpuCores=${{ vars.CONTAINER_CPU_CORES || 2 }}
+              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 2 }} \
+              containerCpuCores=${{ vars.CONTAINER_CPU_CORES || 1 }}
 
       - name: What-If deployment preview
         run: |
@@ -119,8 +119,8 @@ jobs:
               location=${{ env.LOCATION }} \
               containerGroupName=${{ env.CONTAINER_GROUP_NAME }} \
               timeZone="${{ vars.TIME_ZONE || 'Europe/Amsterdam' }}" \
-              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 3 }} \
-              containerCpuCores=${{ vars.CONTAINER_CPU_CORES || 2 }}
+              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 2 }} \
+              containerCpuCores=${{ vars.CONTAINER_CPU_CORES || 1 }}
 
       - name: Deploy to Azure
         id: deploy
@@ -134,8 +134,8 @@ jobs:
               location=${{ env.LOCATION }} \
               containerGroupName=${{ env.CONTAINER_GROUP_NAME }} \
               timeZone="${{ vars.TIME_ZONE || 'Europe/Amsterdam' }}" \
-              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 3 }} \
-              containerCpuCores=${{ vars.CONTAINER_CPU_CORES || 2 }} \
+              containerMemoryGB=${{ vars.CONTAINER_MEMORY_GB || 2 }} \
+              containerCpuCores=${{ vars.CONTAINER_CPU_CORES || 1 }} \
             --query properties.outputs \
             -o json)
           
@@ -145,12 +145,11 @@ jobs:
           # Extract outputs for job summary
           echo "CONTAINER_FQDN=$(echo $output | jq -r .containerFQDN.value)" >> $GITHUB_ENV
           echo "CONTAINER_IP=$(echo $output | jq -r .containerIPv4Address.value)" >> $GITHUB_ENV
-          echo "STORAGE_ACCOUNT=$(echo $output | jq -r .storageAccountName.value)" >> $GITHUB_ENV
 
       - name: Create deployment summary
         run: |
           cat >> $GITHUB_STEP_SUMMARY << EOF
-          # 🚀 Deployment Summary
+          # 🚀 UniFi Controller Deployment Summary
           
           ## Deployment Details
           - **Environment**: ${{ github.event.inputs.environment || 'production' }}
@@ -161,22 +160,29 @@ jobs:
           ## Access Information
           - **FQDN**: https://${{ env.CONTAINER_FQDN }}:8443
           - **IP Address**: ${{ env.CONTAINER_IP }}
-          - **Storage Account**: ${{ env.STORAGE_ACCOUNT }}
+          
+          ## Container Details
+          - **Image**: ghcr.io/jacobalberty/unifi-docker:latest
+          - **Memory**: ${{ vars.CONTAINER_MEMORY_GB || 2 }} GB
+          - **CPU**: ${{ vars.CONTAINER_CPU_CORES || 1 }} cores
           
           ## Post-Deployment Steps
           1. Wait 2-3 minutes for the container to fully start
           2. Access the UniFi Controller at: https://${{ env.CONTAINER_FQDN }}:8443
           3. Complete the initial setup wizard
+          4. Configure automatic backups in UniFi settings
           
           ## Resources Created
-          - ✅ Azure Container Instance with UniFi Network Application (embedded MongoDB)
-          - ✅ Azure Storage Account for backups
+          - ✅ Azure Container Instance with UniFi Network Application
+          - ✅ Embedded MongoDB database
           - ✅ Public IP with DNS name
+          - ✅ All required UniFi ports exposed
           
-          ## Important Notes
-          - MongoDB data stored in EmptyDir volumes (persists during container restarts)
-          - Backups stored in Azure Files for durable storage
-          - Data is lost if container group is deleted - ensure regular backups!
+          ## Data Storage
+          - Data is stored in EmptyDir volumes
+          - Data persists through container restarts
+          - ⚠️ Data will be lost if the container group is deleted
+          - 💡 Configure regular backups through the UniFi interface
           
           ---
           *Deployed by GitHub Actions at $(date -u)*

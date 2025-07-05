@@ -3,13 +3,10 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "location": {
-      "value": ""
+      "value": "westeurope"
     },
     "containerGroupName": {
       "value": "unifi-controller"
-    },
-    "storageAccountName": {
-      "value": ""
     },
     "timeZone": {
       "value": "Europe/Amsterdam"

@@ -1,24 +1,29 @@
-# Local .terraform directories
-**/.terraform/*
+# Compiled ARM templates (for local testing)
+main.json
 
-# .tfstate files
-*.tfstate
-*.tfstate.*
+# Azure deployment outputs
+deployment-outputs.json
 
-# Crash log files
-crash.log
-crash.*.log
-
-# VS Code files
+# IDE files
 .vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
 
 # Local environment files
 .env
 .env.local
 
-# Temporary files
-*.tmp
-*.bak
+# Terraform files (if ever added)
+*.tfstate
+*.tfstate.*
+.terraform/
 
-# Generated ARM templates
-main.json
+# Log files
+*.log

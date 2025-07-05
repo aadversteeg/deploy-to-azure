@@ -1,170 +1,131 @@
-# Deploy to Azure
+# Deploy to Azure - UniFi Controller
 
 This repository contains a Bicep template for deploying a UniFi Controller to Azure Container Instances.
 
 ## Architecture
 
-This solution deploys a **single container** with:
-- UniFi Network Application with embedded MongoDB
-- EmptyDir volumes for data persistence (survives container restarts)
-- Azure Files for backup storage only
+This solution deploys:
+- **Single container** running UniFi Network Application with embedded MongoDB
+- Uses the official GitHub Container Registry image: `ghcr.io/jacobalberty/unifi-docker:latest`
+- EmptyDir volume for data storage
+- Public IP address with DNS name
 
-## What gets deployed?
+## Features
 
-- Azure Container Instance running UniFi Network Application with embedded MongoDB
-- Azure Storage Account with file share for backups
-- Public IP address and DNS name for accessing the UniFi Controller
-- EmptyDir volumes for MongoDB and application data
+- ✅ Simple single-container deployment
+- ✅ No Docker Hub rate limiting (uses GitHub Container Registry)
+- ✅ Embedded MongoDB (no separate database container needed)
+- ✅ Automatic DNS name generation
+- ✅ All required UniFi ports exposed
 
-## Why this approach?
+## Quick Deploy
 
-- **Simple**: Single container with embedded MongoDB
-- **Reliable**: Uses GitHub Container Registry (no Docker Hub rate limits)
-- **Fast**: EmptyDir volumes provide better I/O performance
-- **Safe**: Backups stored in durable Azure Files storage
-
-## Deployment Options
-
-### Option 1: Deploy to Azure Button (One-click deployment)
-
-Click the button below to deploy this template to Azure:
+### Deploy to Azure Button
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Faadversteeg.github.io%2Fdeploy-to-azure%2Flatest%2Fmain.json)
 
-> **Note**: This button always deploys the latest stable release. You can find specific versions in the [Releases](https://github.com/aadversteeg/deploy-to-azure/releases) section.
-
-### Option 2: Deploy using Azure CLI
+### Azure CLI
 
 ```bash
-# Login to Azure
-az login
-
 # Set variables
 RESOURCE_GROUP_NAME="unifi-controller-rg"
-LOCATION="westeurope"  # Change to your preferred Azure region
-DEPLOYMENT_NAME="unifi-controller-deployment"
+LOCATION="westeurope"
 
 # Create Resource Group
 az group create --name $RESOURCE_GROUP_NAME --location $LOCATION
 
-# Deploy the template directly from GitHub Pages
+# Deploy template
 az deployment group create \
   --resource-group $RESOURCE_GROUP_NAME \
-  --name $DEPLOYMENT_NAME \
-  --template-uri https://aadversteeg.github.io/deploy-to-azure/latest/main.json \
+  --template-file main.bicep \
   --parameters location=$LOCATION
-
-# Get the deployment outputs
-az deployment group show \
-  --resource-group $RESOURCE_GROUP_NAME \
-  --name $DEPLOYMENT_NAME \
-  --query properties.outputs
 ```
 
-### Option 3: Deploy using PowerShell
+### PowerShell
 
 ```powershell
-# Login to Azure
-Connect-AzAccount
-
 # Set variables
 $resourceGroupName = "unifi-controller-rg"
-$location = "westeurope"  # Change to your preferred Azure region
-$deploymentName = "unifi-controller-deployment"
+$location = "westeurope"
 
 # Create Resource Group
 New-AzResourceGroup -Name $resourceGroupName -Location $location
 
-# Deploy the template from GitHub Pages
+# Deploy template
 New-AzResourceGroupDeployment `
   -ResourceGroupName $resourceGroupName `
-  -Name $deploymentName `
-  -TemplateUri "https://aadversteeg.github.io/deploy-to-azure/latest/main.json" `
+  -TemplateFile "main.bicep" `
   -location $location
-
-# Get the deployment outputs
-(Get-AzResourceGroupDeployment -ResourceGroupName $resourceGroupName -Name $deploymentName).Outputs
 ```
-
-### Option 4: Manual Deployment via Azure Portal
-
-1. Download the `main.json` file from the [latest release](https://github.com/aadversteeg/deploy-to-azure/releases/latest)
-2. Go to the [Azure Portal](https://portal.azure.com)
-3. Search for "Deploy a custom template"
-4. Click "Build your own template in the editor"
-5. Click "Load file" and select the downloaded `main.json`
-6. Click "Save"
-7. Fill in the required parameters:
-   - **Resource Group**: Create new or select existing
-   - **Location**: Your preferred Azure region
-   - Other parameters as needed (see Parameters section below)
-8. Click "Review + create"
-9. Click "Create"
 
 ## Parameters
 
-| Parameter | Description | Default Value |
-|-----------|-------------|--------------|
-| location | The Azure region to deploy resources to | Resource group's location |
-| containerGroupName | The name of the container group | unifi-controller |
-| storageAccountName | The name of the storage account for backups | Unique generated name |
-| timeZone | Time zone for the container | Europe/Amsterdam |
-| containerMemoryGB | Container memory in GB for UniFi | 3 |
-| containerCpuCores | Container CPU cores for UniFi | 2 |
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| location | Azure region for deployment | Resource group location |
+| containerGroupName | Name of the container group | unifi-controller |
+| timeZone | Container timezone | Europe/Amsterdam |
+| containerMemoryGB | Memory allocation in GB | 2 |
+| containerCpuCores | CPU cores allocation | 1 |
 
-## Post-Deployment
-
-After deployment completes:
-
-1. Navigate to `https://<containerGroupFQDN>:8443` to access the UniFi Controller UI
-2. Complete the initial setup process for your UniFi network
-3. Configure automatic backups in the UniFi settings
-
-## Data Persistence
-
-- **Application Data**: Stored in EmptyDir volumes (persists during container restarts)
-- **Backups**: Stored in Azure Files for durable storage
-- **Important**: EmptyDir data is lost if the container group is deleted - ensure regular backups!
-
-## Ports
-
-The following ports are exposed:
+## Exposed Ports
 
 | Port | Protocol | Purpose |
 |------|----------|---------|
-| 8443 | TCP | UniFi web admin port |
+| 8443 | TCP | UniFi web admin port (HTTPS) |
 | 8080 | TCP | UniFi device communication |
 | 3478 | UDP | UniFi STUN port |
 | 10001 | UDP | AP discovery |
 | 8843 | TCP | UniFi guest portal HTTPS |
 | 6789 | TCP | UniFi mobile speed test |
 
-## CI/CD Pipeline
+## Post-Deployment
 
-This repository uses GitHub Actions for:
-- **Validation** (`validate.yml`) - Validates the Bicep template on every push
-- **Deploy** (`deploy.yml`) - Direct deployment to Azure (manual trigger)
-- **Release** (`release.yml`) - Creates releases with compiled ARM templates
+1. Wait 2-3 minutes for the container to fully initialize
+2. Access the UniFi Controller at: `https://<containerFQDN>:8443`
+3. Complete the initial setup wizard
+4. Adopt your UniFi devices
 
-## Creating a Release
+## Data Persistence
 
-To create a new release:
+⚠️ **Important**: This deployment uses EmptyDir volumes. Data persists through container restarts but will be **lost** if the container group is deleted. For production use, consider:
+- Regular backups through the UniFi interface
+- Exporting your configuration periodically
+- Taking snapshots of your controller settings
 
-1. Make your changes to the Bicep template
-2. Commit and push your changes to main
-3. Wait for the validation workflow to pass
-4. Create a version tag:
-   ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
+## Container Image
 
-## Direct Deployment from GitHub
+This deployment uses the official jacobalberty UniFi Docker image from GitHub Container Registry:
+- Image: `ghcr.io/jacobalberty/unifi-docker:latest`
+- Repository: https://github.com/jacobalberty/unifi-docker
+- No Docker Hub rate limiting issues
+- Includes embedded MongoDB
 
-For direct deployment using GitHub Actions, see [DEPLOYMENT_CONFIG.md](DEPLOYMENT_CONFIG.md).
+## Troubleshooting
 
-## Workflow Status
+### Container Won't Start
+- Check the container logs in Azure Portal
+- Ensure sufficient memory/CPU allocation
+- Verify all required ports are available
 
-![Validate Bicep](https://github.com/aadversteeg/deploy-to-azure/actions/workflows/validate.yml/badge.svg)
-![Deploy to Azure](https://github.com/aadversteeg/deploy-to-azure/actions/workflows/deploy.yml/badge.svg)
-![Release](https://github.com/aadversteeg/deploy-to-azure/actions/workflows/release.yml/badge.svg)
+### Can't Access Web Interface
+- Wait 2-3 minutes after deployment
+- Check the FQDN in deployment outputs
+- Ensure you're using HTTPS on port 8443
+- Accept the self-signed certificate warning
+
+### Performance Issues
+- Increase memory allocation (3-4 GB recommended for larger deployments)
+- Increase CPU cores for better performance
+- Monitor container metrics in Azure Portal
+
+## Security Considerations
+
+- Change default credentials immediately after setup
+- Consider implementing Azure Network Security Groups
+- Use Azure Firewall for additional protection
+- Enable UniFi's built-in security features
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
