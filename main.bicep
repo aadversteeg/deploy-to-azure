@@ -105,22 +105,6 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
               name: 'UNIFI_GID'
               value: '999'
             }
-            {
-              name: 'DB_MONGO_LOCAL'
-              value: 'true'
-            }
-            {
-              name: 'DB_MONGO_URL'
-              value: 'mongodb://127.0.0.1:27017/unifi'
-            }
-            {
-              name: 'STATDB_MONGO_URL'
-              value: 'mongodb://127.0.0.1:27017/unifi_stat'
-            }
-            {
-              name: 'UNIFI_DB_NAME'
-              value: 'unifi'
-            }
           ]
           volumeMounts: [
             {
