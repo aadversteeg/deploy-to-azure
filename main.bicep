@@ -4,21 +4,19 @@ param location string = resourceGroup().location
 @description('Name for the container group')
 param containerGroupName string = 'unifi-controller'
 
-@description('Name of the storage account')
+@description('Name of the storage account for backups')
 param storageAccountName string = 'stor${uniqueString(resourceGroup().id)}'
-
-@description('Name of the file share')
-param fileShareName string = 'unifi-controller'
 
 @description('Time zone for the container')
 param timeZone string = 'Europe/Amsterdam'
 
-@description('File share size in GB')
-param fileShareSizeGB int = 5
-
 @description('Container memory in GB')
-param containerMemoryGB int = 2
+param containerMemoryGB int = 3
 
+@description('Container CPU cores')
+param containerCpuCores int = 2
+
+// Storage account for backups only
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
   location: location
@@ -29,6 +27,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   properties: {
     accessTier: 'Hot'
     supportsHttpsTrafficOnly: true
+    minimumTlsVersion: 'TLS1_2'
   }
 }
 
@@ -37,25 +36,26 @@ resource fileService 'Microsoft.Storage/storageAccounts/fileServices@2023-05-01'
   name: 'default'
 }
 
-resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023-05-01' = {
+resource backupShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023-05-01' = {
   parent: fileService
-  name: fileShareName
+  name: 'unifi-backups'
   properties: {
-    shareQuota: fileShareSizeGB * 1024
+    shareQuota: 10
     accessTier: 'TransactionOptimized'
     enabledProtocols: 'SMB'
   }
 }
 
+// Container Instance with UniFi Controller
 resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
   name: containerGroupName
   location: location
   properties: {
     containers: [
       {
-        name: 'unifi-${uniqueString(resourceGroup().id)}'
+        name: 'unifi-controller'
         properties: {
-          image: 'ghcr.io/jacobalberty/unifi-docker:v8.1'
+          image: 'ghcr.io/jacobalberty/unifi-docker:latest-v8'
           ports: [
             {
               port: 8443
@@ -73,10 +73,18 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
               port: 10001
               protocol: 'UDP'
             }
+            {
+              port: 8843
+              protocol: 'TCP'
+            }
+            {
+              port: 6789
+              protocol: 'TCP'
+            }
           ]
           resources: {
             requests: {
-              cpu: json('1')
+              cpu: json(string(containerCpuCores))
               memoryInGB: json(string(containerMemoryGB))
             }
           }
@@ -85,11 +93,51 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
               name: 'TZ'
               value: timeZone
             }
+            {
+              name: 'UNIFI_UID'
+              value: '1000'
+            }
+            {
+              name: 'UNIFI_GID'
+              value: '1000'
+            }
+            {
+              name: 'BIND_PRIV'
+              value: 'false'
+            }
+            {
+              name: 'DB_MONGO_LOCAL'
+              value: 'true'
+            }
+            {
+              name: 'DB_MONGO_URL'
+              value: 'mongodb://127.0.0.1:27017/unifi'
+            }
+            {
+              name: 'STATDB_MONGO_URL'
+              value: 'mongodb://127.0.0.1:27017/unifi_stat'
+            }
+            {
+              name: 'UNIFI_DB_NAME'
+              value: 'unifi'
+            }
           ]
           volumeMounts: [
             {
-              name: 'unifi-config'
-              mountPath: '/unifi'
+              name: 'unifi-data'
+              mountPath: '/usr/lib/unifi/data'
+            }
+            {
+              name: 'unifi-logs'
+              mountPath: '/usr/lib/unifi/logs'
+            }
+            {
+              name: 'mongodb-data'
+              mountPath: '/usr/lib/unifi/data/db'
+            }
+            {
+              name: 'unifi-backups'
+              mountPath: '/usr/lib/unifi/data/backup'
             }
           ]
         }
@@ -116,14 +164,34 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
           port: 10001
           protocol: 'UDP'
         }
+        {
+          port: 8843
+          protocol: 'TCP'
+        }
+        {
+          port: 6789
+          protocol: 'TCP'
+        }
       ]
-      dnsNameLabel: 'unifi-controller-${uniqueString(resourceGroup().id)}'
+      dnsNameLabel: 'unifi-${uniqueString(resourceGroup().id)}'
     }
     volumes: [
       {
-        name: 'unifi-config'
+        name: 'unifi-data'
+        emptyDir: {}
+      }
+      {
+        name: 'unifi-logs'
+        emptyDir: {}
+      }
+      {
+        name: 'mongodb-data'
+        emptyDir: {}
+      }
+      {
+        name: 'unifi-backups'
         azureFile: {
-          shareName: fileShare.name
+          shareName: backupShare.name
           storageAccountName: storageAccount.name
           storageAccountKey: storageAccount.listKeys().keys[0].value
         }
@@ -135,3 +203,6 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
 output containerIPv4Address string = containerGroup.properties.ipAddress.ip
 output containerFQDN string = containerGroup.properties.ipAddress.fqdn
 output storageAccountName string = storageAccount.name
+output backupShareName string = backupShare.name
+output accessUrl string = 'https://${containerGroup.properties.ipAddress.fqdn}:8443'
+output deploymentNotes string = 'Single container with embedded MongoDB. Data in EmptyDir, backups in Azure Files.'

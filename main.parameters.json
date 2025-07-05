@@ -5,14 +5,20 @@
     "location": {
       "value": ""
     },
+    "containerGroupName": {
+      "value": "unifi-controller"
+    },
     "storageAccountName": {
       "value": ""
     },
-    "storageSku": {
-      "value": "Standard_LRS"
+    "timeZone": {
+      "value": "Europe/Amsterdam"
     },
-    "fileShareName": {
-      "value": "unifi-controller"
+    "containerMemoryGB": {
+      "value": 3
+    },
+    "containerCpuCores": {
+      "value": 2
     }
   }
 }

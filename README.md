@@ -1,12 +1,27 @@
 # Deploy to Azure
 
-This repository contains a Bicep template for deploying a Unifi Controller to Azure Container Instances.
+This repository contains a Bicep template for deploying a UniFi Controller to Azure Container Instances.
+
+## Architecture
+
+This solution deploys a **single container** with:
+- UniFi Network Application with embedded MongoDB
+- EmptyDir volumes for data persistence (survives container restarts)
+- Azure Files for backup storage only
 
 ## What gets deployed?
 
-- Azure Storage Account with a file share for Unifi configuration
-- Azure Container Instance running the Unifi Controller
-- Public IP address and DNS name for accessing the Unifi Controller
+- Azure Container Instance running UniFi Network Application v8
+- Azure Storage Account with file share for backups
+- Public IP address and DNS name for accessing the UniFi Controller
+- EmptyDir volumes for MongoDB and application data
+
+## Why this approach?
+
+- **Simple**: Single container with embedded MongoDB
+- **Reliable**: Avoids Azure Files compatibility issues with MongoDB
+- **Fast**: EmptyDir volumes provide better I/O performance
+- **Safe**: Backups stored in durable Azure Files storage
 
 ## Deployment Options
 
@@ -92,30 +107,44 @@ New-AzResourceGroupDeployment `
 |-----------|-------------|--------------|
 | location | The Azure region to deploy resources to | Resource group's location |
 | containerGroupName | The name of the container group | unifi-controller |
-| storageAccountName | The name of the storage account | Unique generated name |
-| fileShareName | The name of the file share | unifi-controller |
+| storageAccountName | The name of the storage account for backups | Unique generated name |
 | timeZone | Time zone for the container | Europe/Amsterdam |
-| fileShareSizeGB | File share size in GB | 5 |
-| containerMemoryGB | Container memory in GB | 2 |
+| containerMemoryGB | Container memory in GB | 3 |
+| containerCpuCores | Container CPU cores | 2 |
 
 ## Post-Deployment
 
 After deployment completes:
 
-1. Navigate to `https://<containerGroupFQDN>:8443` to access the Unifi Controller UI
-2. Complete the initial setup process for your Unifi network
+1. Navigate to `https://<containerGroupFQDN>:8443` to access the UniFi Controller UI
+2. Complete the initial setup process for your UniFi network
+3. Configure automatic backups in the UniFi settings
 
-## How it works
+## Data Persistence
 
-This repository uses GitHub Actions to:
-1. **Validate** (`validate.yml`) - Automatically validates and compiles the Bicep template on every push to main and every pull request
-2. **Deploy** (`deploy.yml`) - Directly deploys to Azure on push to main or manual trigger with configurable parameters
-3. **Release** (`release.yml`) - Creates GitHub releases with the compiled ARM template when you create a version tag
-4. **GitHub Pages** - Publishes the ARM template to GitHub Pages for easy deployment with the "Deploy to Azure" button
+- **Application Data**: Stored in EmptyDir volumes (persists during container restarts)
+- **Backups**: Stored in Azure Files for durable storage
+- **Important**: EmptyDir data is lost if the container group is deleted - ensure regular backups!
 
-The ARM templates are available at:
-- Latest version: https://aadversteeg.github.io/deploy-to-azure/latest/main.json
-- Specific versions: https://aadversteeg.github.io/deploy-to-azure/v{VERSION}/main.json
+## Ports
+
+The following ports are exposed:
+
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 8443 | TCP | UniFi web admin port |
+| 8080 | TCP | UniFi device communication |
+| 3478 | UDP | UniFi STUN port |
+| 10001 | UDP | AP discovery |
+| 8843 | TCP | UniFi guest portal HTTPS |
+| 6789 | TCP | UniFi mobile speed test |
+
+## CI/CD Pipeline
+
+This repository uses GitHub Actions for:
+- **Validation** (`validate.yml`) - Validates the Bicep template on every push
+- **Deploy** (`deploy.yml`) - Direct deployment to Azure (manual trigger)
+- **Release** (`release.yml`) - Creates releases with compiled ARM templates
 
 ## Creating a Release
 
@@ -126,35 +155,13 @@ To create a new release:
 3. Wait for the validation workflow to pass
 4. Create a version tag:
    ```bash
-   git tag 1.0.0  # or v1.0.0
-   git push origin 1.0.0
+   git tag v1.0.0
+   git push origin v1.0.0
    ```
-
-The release workflow will:
-- Compile the Bicep template to ARM JSON
-- Create a GitHub release with:
-  - `main.json` - ARM template ready for deployment
-  - `main.bicep` - Source Bicep template
-  - `main.parameters.json` - Parameters file
-  - `main.parameters.example.json` - Example parameters with values
-  - `DEPLOYMENT_GUIDE.md` - Detailed deployment instructions
-  - ZIP package with all files
 
 ## Direct Deployment from GitHub
 
-This repository also supports direct deployment to Azure using GitHub Actions:
-
-### Setup
-1. Create an Azure Service Principal and add it as a GitHub secret named `AZURE_CREDENTIALS`
-2. Configure repository variables:
-   - `AZURE_SUBSCRIPTION_ID` (required)
-   - `AZURE_RESOURCE_GROUP` (required)
-   - Additional optional variables (see [DEPLOYMENT_CONFIG.md](DEPLOYMENT_CONFIG.md))
-
-### Deploy
-- **Manual**: Use Actions → Deploy to Azure → Run workflow
-
-For detailed configuration instructions, see [DEPLOYMENT_CONFIG.md](DEPLOYMENT_CONFIG.md).
+For direct deployment using GitHub Actions, see [DEPLOYMENT_CONFIG.md](DEPLOYMENT_CONFIG.md).
 
 ## Workflow Status
 
