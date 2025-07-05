@@ -8,10 +8,10 @@ param containerGroupName string = 'unifi-controller'
 param timeZone string = 'Europe/Amsterdam'
 
 @description('Container memory in GB')
-param containerMemoryGB int = 2
+param containerMemoryGB int = 3
 
 @description('Container CPU cores')
-param containerCpuCores int = 1
+param containerCpuCores int = 2
 
 // Single Container with UniFi Controller (includes embedded MongoDB)
 resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
@@ -22,7 +22,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
       {
         name: 'unifi-controller'
         properties: {
-          image: 'ghcr.io/jacobalberty/unifi-docker:v9.2.87'
+          image: 'jacobalberty/unifi:v8.6.9'
           ports: [
             {
               port: 8443
@@ -76,11 +76,19 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
               name: 'JVM_MAX_HEAP_SIZE'
               value: '1024M'
             }
+            {
+              name: 'BIND_PRIV'
+              value: 'false'
+            }
           ]
           volumeMounts: [
             {
               name: 'unifi-data'
               mountPath: '/unifi'
+            }
+            {
+              name: 'unifi-run'
+              mountPath: '/var/run/unifi'
             }
           ]
         }
@@ -123,6 +131,10 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
         name: 'unifi-data'
         emptyDir: {}
       }
+      {
+        name: 'unifi-run'
+        emptyDir: {}
+      }
     ]
   }
 }
@@ -130,4 +142,4 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
 output containerIPv4Address string = containerGroup.properties.ipAddress.ip
 output containerFQDN string = containerGroup.properties.ipAddress.fqdn
 output accessUrl string = 'https://${containerGroup.properties.ipAddress.fqdn}:8443'
-output deploymentNotes string = 'UniFi Controller v9.2.87 with embedded MongoDB from ghcr.io'
+output deploymentNotes string = 'UniFi Controller v8.6.9 with embedded MongoDB from Docker Hub'
