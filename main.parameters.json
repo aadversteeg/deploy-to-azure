@@ -15,10 +15,10 @@
       "value": "Europe/Amsterdam"
     },
     "containerMemoryGB": {
-      "value": 3
+      "value": 2
     },
     "containerCpuCores": {
-      "value": 2
+      "value": 1
     }
   }
 }

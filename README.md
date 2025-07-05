@@ -4,17 +4,19 @@ This repository contains a Bicep template for deploying a UniFi Controller to Az
 
 ## Architecture
 
-This solution deploys a **single container** with:
-- UniFi Network Application with embedded MongoDB
-- EmptyDir volumes for data persistence (survives container restarts)
-- Azure Files for backup storage only
+This solution uses a **hybrid approach**:
+- **Two containers**: UniFi Network Application + MongoDB 4.4 sidecar
+- **EmptyDir volumes** for MongoDB data (avoids Azure Files issues)
+- **Azure Files** for backup storage only
 
 ## What gets deployed?
 
-- Azure Container Instance running UniFi Network Application v8
+- Azure Container Instance with:
+  - UniFi Network Application container
+  - MongoDB 4.4 sidecar container
 - Azure Storage Account with file share for backups
-- Public IP address and DNS name for accessing the UniFi Controller
-- EmptyDir volumes for MongoDB and application data
+- Public IP address and DNS name
+- EmptyDir volumes for data persistence
 
 ## Why this approach?
 
@@ -109,8 +111,8 @@ New-AzResourceGroupDeployment `
 | containerGroupName | The name of the container group | unifi-controller |
 | storageAccountName | The name of the storage account for backups | Unique generated name |
 | timeZone | Time zone for the container | Europe/Amsterdam |
-| containerMemoryGB | Container memory in GB | 3 |
-| containerCpuCores | Container CPU cores | 2 |
+| containerMemoryGB | Container memory in GB for UniFi | 2 |
+| containerCpuCores | Container CPU cores for UniFi | 1 |
 
 ## Post-Deployment
 
